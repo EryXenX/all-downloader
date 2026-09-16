@@ -1,6 +1,19 @@
 const express = require("express");
 const cors = require("cors");
+const axios = require("axios");
 const { igdl, ttdl, fbdown, youtube } = require("btch-downloader");
+
+async function resolveRedirect(url) {
+    try {
+        const res = await axios.get(url, {
+            maxRedirects: 10,
+            headers: { "User-Agent": "Mozilla/5.0" }
+        });
+        return res.request.res.responseUrl || url;
+    } catch {
+        return url;
+    }
+}
 
 const app = express();
 app.use(cors());
@@ -45,10 +58,11 @@ app.get("/api/tiktok", async (req, res) => {
     const { url } = req.query;
     if (!url) return res.status(400).json({ status: false, message: "url is required" });
     try {
-        const data = await ttdl(url);
+        const resolvedUrl = await resolveRedirect(url);
+        const data = await ttdl(resolvedUrl);
         res.json({ status: true, platform: "tiktok", result: data });
     } catch (err) {
-        res.status(500).json({ status: false, message: "Failed to fetch TikTok media" });
+        res.status(500).json({ status: false, message: "Failed to fetch TikTok media", error: err.message });
     }
 });
 
@@ -56,10 +70,11 @@ app.get("/api/fb", async (req, res) => {
     const { url } = req.query;
     if (!url) return res.status(400).json({ status: false, message: "url is required" });
     try {
-        const data = await fbdown(url);
+        const resolvedUrl = await resolveRedirect(url);
+        const data = await fbdown(resolvedUrl);
         res.json({ status: true, platform: "facebook", result: data });
     } catch (err) {
-        res.status(500).json({ status: false, message: "Failed to fetch Facebook media" });
+        res.status(500).json({ status: false, message: "Failed to fetch Facebook media", error: err.message });
     }
 });
 
@@ -84,8 +99,8 @@ app.get("/api/download", async (req, res) => {
     try {
         let data;
         if (platform === "instagram") data = await igdl(url);
-        if (platform === "tiktok") data = await ttdl(url);
-        if (platform === "facebook") data = await fbdown(url);
+        if (platform === "tiktok") data = await ttdl(await resolveRedirect(url));
+        if (platform === "facebook") data = await fbdown(await resolveRedirect(url));
         if (platform === "youtube") data = await youtube(url);
 
         res.json({ status: true, platform, result: data });
