@@ -69,12 +69,13 @@ app.get("/api/tiktok", async (req, res) => {
 app.get("/api/fb", async (req, res) => {
     const { url } = req.query;
     if (!url) return res.status(400).json({ status: false, message: "url is required" });
+    let resolvedUrl = url;
     try {
-        const resolvedUrl = await resolveRedirect(url);
+        resolvedUrl = await resolveRedirect(url);
         const data = await fbdown(resolvedUrl);
         res.json({ status: true, platform: "facebook", result: data });
     } catch (err) {
-        res.status(500).json({ status: false, message: "Failed to fetch Facebook media", error: err.message });
+        res.status(500).json({ status: false, message: "Failed to fetch Facebook media", error: err.message, resolvedUrl });
     }
 });
 
