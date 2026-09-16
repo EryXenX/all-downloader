@@ -7,7 +7,7 @@
   },
   "dependencies": {
     "axios": "^1.7.7",
-    "btch-downloader": "^2.5.4",
+    "btch-downloader": "^4.0.9",
     "cors": "^2.8.5",
     "express": "^4.19.2"
   },

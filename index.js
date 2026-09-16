@@ -66,6 +66,10 @@ app.get("/api/tiktok", async (req, res) => {
     }
 });
 
+function stripQuery(url) {
+    return url.split("?")[0];
+}
+
 function toFbWatchUrl(url) {
     const match = url.match(/\/reel\/(\d+)/);
     if (match) return `https://www.facebook.com/watch/?v=${match[1]}`;
@@ -78,11 +82,12 @@ app.get("/api/fb", async (req, res) => {
     let resolvedUrl = url;
     try {
         resolvedUrl = await resolveRedirect(url);
+        const cleanUrl = stripQuery(resolvedUrl);
         let data;
         try {
-            data = await fbdown(resolvedUrl);
+            data = await fbdown(cleanUrl);
         } catch (firstErr) {
-            const altUrl = toFbWatchUrl(resolvedUrl);
+            const altUrl = toFbWatchUrl(cleanUrl);
             if (!altUrl) throw firstErr;
             data = await fbdown(altUrl);
         }
@@ -115,7 +120,7 @@ app.get("/api/download", async (req, res) => {
         if (platform === "instagram") data = await igdl(url);
         if (platform === "tiktok") data = await ttdl(await resolveRedirect(url));
         if (platform === "facebook") {
-            const resolvedUrl = await resolveRedirect(url);
+            const resolvedUrl = stripQuery(await resolveRedirect(url));
             try {
                 data = await fbdown(resolvedUrl);
             } catch (firstErr) {
