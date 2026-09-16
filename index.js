@@ -66,13 +66,26 @@ app.get("/api/tiktok", async (req, res) => {
     }
 });
 
+function toFbWatchUrl(url) {
+    const match = url.match(/\/reel\/(\d+)/);
+    if (match) return `https://www.facebook.com/watch/?v=${match[1]}`;
+    return null;
+}
+
 app.get("/api/fb", async (req, res) => {
     const { url } = req.query;
     if (!url) return res.status(400).json({ status: false, message: "url is required" });
     let resolvedUrl = url;
     try {
         resolvedUrl = await resolveRedirect(url);
-        const data = await fbdown(resolvedUrl);
+        let data;
+        try {
+            data = await fbdown(resolvedUrl);
+        } catch (firstErr) {
+            const altUrl = toFbWatchUrl(resolvedUrl);
+            if (!altUrl) throw firstErr;
+            data = await fbdown(altUrl);
+        }
         res.json({ status: true, platform: "facebook", result: data });
     } catch (err) {
         res.status(500).json({ status: false, message: "Failed to fetch Facebook media", error: err.message, resolvedUrl });
@@ -101,7 +114,16 @@ app.get("/api/download", async (req, res) => {
         let data;
         if (platform === "instagram") data = await igdl(url);
         if (platform === "tiktok") data = await ttdl(await resolveRedirect(url));
-        if (platform === "facebook") data = await fbdown(await resolveRedirect(url));
+        if (platform === "facebook") {
+            const resolvedUrl = await resolveRedirect(url);
+            try {
+                data = await fbdown(resolvedUrl);
+            } catch (firstErr) {
+                const altUrl = toFbWatchUrl(resolvedUrl);
+                if (!altUrl) throw firstErr;
+                data = await fbdown(altUrl);
+            }
+        }
         if (platform === "youtube") data = await youtube(url);
 
         res.json({ status: true, platform, result: data });
