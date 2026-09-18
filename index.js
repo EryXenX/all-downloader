@@ -1,7 +1,12 @@
 const express = require("express");
 const cors = require("cors");
 const axios = require("axios");
-const { igdl, ttdl, fbdown, youtube } = require("btch-downloader");
+const { igdl, ttdl, fbdown } = require("btch-downloader");
+
+// YouTube downloads are proxied to the EryXenX yt-dlp/y2mate API deployed on
+// Railway, since btch-downloader's own youtube() stopped working.
+const YT_PROXY_BASE =
+    "https://youtube-download-api-production-6bbe.up.railway.app/api/dl";
 
 async function resolveRedirect(url) {
     try {
@@ -13,6 +18,17 @@ async function resolveRedirect(url) {
     } catch {
         return url;
     }
+}
+
+async function youtube(url) {
+    const apiUrl = `${YT_PROXY_BASE}?link=${encodeURIComponent(url)}&format=mp4`;
+    const { data } = await axios.get(apiUrl, { timeout: 60_000 });
+
+    if (data.status !== "success" || !data.data?.downloadUrl) {
+        throw new Error(data.error || "Railway YouTube proxy did not return a download URL");
+    }
+
+    return data.data;
 }
 
 const app = express();
@@ -101,10 +117,10 @@ app.get("/api/youtube", async (req, res) => {
     const { url } = req.query;
     if (!url) return res.status(400).json({ status: false, message: "url is required" });
     try {
-        const data = await youtube(url);
-        res.json({ status: true, platform: "youtube", result: data });
+        const result = await youtube(url);
+        res.json({ status: true, platform: "youtube", result });
     } catch (err) {
-        res.status(500).json({ status: false, message: "Failed to fetch YouTube media" });
+        res.status(502).json({ status: false, message: "Failed to fetch YouTube media", error: err.message });
     }
 });
 
@@ -133,7 +149,7 @@ app.get("/api/download", async (req, res) => {
 
         res.json({ status: true, platform, result: data });
     } catch (err) {
-        res.status(500).json({ status: false, message: `Failed to fetch ${platform} media` });
+        res.status(502).json({ status: false, message: `Failed to fetch ${platform} media`, error: err.message });
     }
 });
 
